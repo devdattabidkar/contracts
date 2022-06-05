@@ -1,17 +1,15 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Heritage is Ownable {
-    uint256 MAX_INT = 2**256 - 1;
-
     event NewTestator(
         address inheritor,
         Status status,
-        uint256 proofTimestamp,
-        IERC20 token,
+        uint256 proofOfTimestamp,
+        address token,
         uint16 maxDays
     );
 
@@ -28,20 +26,17 @@ contract Heritage is Ownable {
     struct Testator {
         address inheritor;
         Status status;
-        uint256 proofTimestamp;
-        IERC20 token;
+        uint256 proofOfTimestamp;
+        address token;
         uint16 maxDays;
     }
 
-    Testator[] private testators;
-
-    mapping(address => uint256) private testatorIndexes;
-    mapping(address => address) private testatorToInheritor;
+    mapping(address => Testator) private testators;
     mapping(address => address) private inheritorToTestator;
 
     modifier onlyTestator() {
         require(
-            testatorIndexes[msg.sender] >= 0,
+            testators[msg.sender].inheritor != address(0x0),
             "The address is not a valid testator."
         );
         _;
@@ -49,7 +44,7 @@ contract Heritage is Ownable {
 
     modifier onlyActive() {
         require(
-            testators[testatorIndexes[msg.sender]].status == Status.ACTIVE,
+            testators[msg.sender].status == Status.ACTIVE,
             "The address holder is not active."
         );
         _;
@@ -57,108 +52,128 @@ contract Heritage is Ownable {
 
     modifier onlyInheritor() {
         require(
-            testatorIndexes[
-                testatorToInheritor[inheritorToTestator[msg.sender]]
-            ] >= 0,
+            inheritorToTestator[msg.sender] != address(0x0),
             "The address is not a valid inheritor."
         );
         _;
     }
 
-    modifier onlyInactive() {
+    modifier timeAlreadyPassed() {
+        Testator storage _testator = testators[inheritorToTestator[msg.sender]];
+        uint256 _timestamp = block.timestamp;
+
         require(
-            testators[testatorIndexes[msg.sender]].status == Status.INACTIVE,
-            "The address holder is not inactive."
+            _timestamp >=
+                _testator.proofOfTimestamp + _testator.maxDays * 1 days,
+            "The max days did not passed yet."
         );
         _;
     }
 
-    // TODO: Validate parameters;
+    modifier greaterThan(uint16 _maxDays) {
+        require(_maxDays > 0, "maxDays should be greater than 0.");
+        _;
+    }
+
+    modifier uniqueTestator() {
+        require(
+            testators[msg.sender].inheritor == address(0x0),
+            "Testator already have a testament."
+        );
+        _;
+    }
+
     function addTestator(
         address _inheritor,
         address _token,
         uint16 _maxDays
-    ) public {
+    ) public greaterThan(_maxDays) uniqueTestator {
         IERC20 token = IERC20(_token);
 
-        // TODO: Validate if this is a valid token somehow.
-        testators.push(
-            Testator(
-                _inheritor,
-                Status.ACTIVE,
-                block.timestamp,
-                token,
-                _maxDays
-            )
+        uint256 _allowance = token.allowance(msg.sender, address(this));
+
+        require(_allowance > 0, "Token allowance should be greater than 0.");
+
+        Testator memory _testator = Testator(
+            _inheritor,
+            Status.ACTIVE,
+            block.timestamp,
+            _token,
+            _maxDays
         );
 
-        uint256 index = testators.length - 1;
+        testators[msg.sender] = _testator;
 
-        testatorIndexes[msg.sender] = index;
-        testatorToInheritor[msg.sender] = _inheritor;
         inheritorToTestator[_inheritor] = msg.sender;
 
-        token.approve(_inheritor, MAX_INT);
-
         emit NewTestator(
-            testators[index].inheritor,
-            testators[index].status,
-            testators[index].proofTimestamp,
-            testators[index].token,
-            testators[index].maxDays
+            _testator.inheritor,
+            _testator.status,
+            _testator.proofOfTimestamp,
+            _testator.token,
+            _testator.maxDays
         );
     }
 
-    function getTestator()
+    function getTestator(address _testatorAddress)
         public
         view
         returns (
             address,
             Status,
             uint256,
-            IERC20
+            address,
+            uint16
         )
     {
-        uint256 index = testatorIndexes[msg.sender];
-        Testator memory _testator = testators[index];
+        Testator memory _testator = testators[_testatorAddress];
+
+        require(
+            _testator.inheritor != address(0x00),
+            "The testator does not exist."
+        );
 
         return (
             _testator.inheritor,
             _testator.status,
-            _testator.proofTimestamp,
-            _testator.token
+            _testator.proofOfTimestamp,
+            _testator.token,
+            _testator.maxDays
         );
     }
 
-    function updateProof() public onlyTestator onlyActive {
+    function updateProof() public onlyTestator onlyActive returns (bool) {
         uint256 _timestamp = block.timestamp;
 
-        uint256 _maxDays = testators[testatorIndexes[msg.sender]].maxDays;
-        uint256 _proofTimestamp = testators[testatorIndexes[msg.sender]]
-            .proofTimestamp;
+        Testator storage _testator = testators[msg.sender];
 
-        if (_timestamp >= _proofTimestamp + _maxDays * 1 days) {
-            testators[testatorIndexes[msg.sender]].status = Status.INACTIVE;
+        if (
+            _timestamp >=
+            _testator.proofOfTimestamp + _testator.maxDays * 1 days
+        ) {
+            _testator.status = Status.INACTIVE;
 
-            revert("The user cannot update the alive pprof");
+            return false;
         }
 
-        testators[testatorIndexes[msg.sender]].proofTimestamp = _timestamp;
+        _testator.proofOfTimestamp = _timestamp;
 
         emit ProofUpdated(msg.sender, _timestamp);
+
+        return true;
     }
 
-    function inherit() public onlyInheritor onlyInactive {
-        Testator storage _testator = testators[
-            testatorIndexes[
-                testatorToInheritor[inheritorToTestator[msg.sender]]
-            ]
-        ];
-        uint256 _balance = _testator.token.balanceOf(
-            inheritorToTestator[msg.sender]
-        );
+    function inherit() public onlyInheritor timeAlreadyPassed {
+        Testator storage _testator = testators[inheritorToTestator[msg.sender]];
 
-        _testator.token.transfer(msg.sender, _balance);
+        IERC20 token = IERC20(_testator.token);
+        uint256 _balance = token.balanceOf(inheritorToTestator[msg.sender]);
+
+        token.transferFrom(
+            inheritorToTestator[msg.sender],
+            msg.sender,
+            _balance
+        );
 
         _testator.status = Status.INHERITED;
 
