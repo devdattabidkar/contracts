@@ -4,8 +4,8 @@ pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 uint256 constant TOTAL_SUPPLY = 1000000000000000000000000000;
-string constant NAME = "MOCK_TOKEN";
-string constant SYMBOL = "MCK";
+string constant NAME = "PEACE_TOKEN";
+string constant SYMBOL = "PAZ";
 
 contract MockERC20 is ERC20 {
     constructor() ERC20(NAME, SYMBOL) {

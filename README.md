@@ -1,14 +1,11 @@
-# Peace contracts
+# Peace 
 
+## Contracts
 
-## Deploy
+[Heritage](https://testnet.snowtrace.io/address/0x67F488df4900Dbf429C29caD7DF28138e8DBb3cc)
 
-```
-npx hardhat run --network avalancheFuji scripts/deploy.js
-```
+[Mock ERC20](https://testnet.snowtrace.io/address/0x500712d4aAF05F25f171b2b615A6592D2725c850)
 
-## Verify
+## Addresses
 
-```
-npx hardhat verify --network avalancheFuji 0xd129502154970a8Be013a184243fa01F2b1eAbC9
-```
+* Deployer: `0x0F4d0a8DE3Cf15d70f3A8EE37534Ba4744F40C5d`
