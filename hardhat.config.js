@@ -3,6 +3,7 @@ require('@nomiclabs/hardhat-solhint');
 require('@nomiclabs/hardhat-waffle');
 require('@openzeppelin/hardhat-upgrades');
 require('dotenv').config();
+require('hardhat-docgen');
 require('solidity-coverage');
 
 const AVALANCHE_PRIVATE_KEY = process.env.AVALANCHE_PRIVATE_KEY;

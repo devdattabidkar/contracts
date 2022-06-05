@@ -17,6 +17,14 @@ contract Heritage is Ownable {
 
     event Inherited(address _testator, address _inheritor, uint256 _balance);
 
+    event Revoke(
+        address inheritor,
+        Status status,
+        uint256 proofOfTimestamp,
+        address token,
+        uint16 maxDays
+    );
+
     enum Status {
         ACTIVE,
         INACTIVE,
@@ -36,7 +44,7 @@ contract Heritage is Ownable {
 
     modifier onlyTestator() {
         require(
-            testators[msg.sender].inheritor != address(0x0),
+            testators[msg.sender].inheritor != address(0),
             "The address is not a valid testator."
         );
         _;
@@ -52,7 +60,7 @@ contract Heritage is Ownable {
 
     modifier onlyInheritor() {
         require(
-            inheritorToTestator[msg.sender] != address(0x0),
+            inheritorToTestator[msg.sender] != address(0),
             "The address is not a valid inheritor."
         );
         _;
@@ -77,7 +85,7 @@ contract Heritage is Ownable {
 
     modifier uniqueTestator() {
         require(
-            testators[msg.sender].inheritor == address(0x0),
+            testators[msg.sender].inheritor == address(0),
             "Testator already have a testament."
         );
         _;
@@ -178,5 +186,20 @@ contract Heritage is Ownable {
         _testator.status = Status.INHERITED;
 
         emit Inherited(inheritorToTestator[msg.sender], msg.sender, _balance);
+    }
+
+    function revoke() public onlyTestator onlyActive {
+        Testator memory _testator = testators[msg.sender];
+
+        delete inheritorToTestator[_testator.inheritor];
+        delete testators[msg.sender];
+
+        emit Revoke(
+            _testator.inheritor,
+            _testator.status,
+            _testator.proofOfTimestamp,
+            _testator.token,
+            _testator.maxDays
+        );
     }
 }

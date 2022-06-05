@@ -1,5 +1,5 @@
 const { expect } = require('chai');
-const { ethers, BigNumber } = require('hardhat');
+const { ethers } = require('hardhat');
 
 const ONE_AVAX = ethers.utils.parseEther('1');
 const STATUS = {
@@ -14,20 +14,29 @@ describe('Heritage', () => {
   let Erc20;
   let mockToken;
   
-  let inheritor;
-  let owner;
-
   const increaseDays = async (days) => {
     await network.provider.send('evm_increaseTime', [days * 24 * 60 * 60]);
     await network.provider.send('evm_mine');
   };
   
-  const approveAllowance = async (allowance = ONE_AVAX) => {
-    await mockToken.connect(testator).approve(heritage.address, allowance);      
+  const approveAllowance = async ({ allowance = ONE_AVAX, signer = testator } = {}) => {
+    await mockToken.connect(signer).approve(heritage.address, allowance);    
   }
 
   before(async () => {
-    [owner, testator, inheritor, accountWithoutAllowance, accountNotInheritor] = await ethers.getSigners();
+    [
+      owner,
+      testator, 
+      inheritor, 
+      accountWithoutAllowance, 
+      accountNotInheritor,
+      testator1,
+      testator2,
+      testator3,
+      inheritor1,
+      inheritor2,
+      inheritor3
+    ] = await ethers.getSigners();
 
     Erc20 = await ethers.getContractFactory('MockERC20');
 
@@ -238,5 +247,50 @@ describe('Heritage', () => {
       )
         .to.be.revertedWith('The max days did not passed yet.');
     })
+  });
+
+  describe('revoke', () => {
+    beforeEach(async () => {
+      const promises = [
+        [testator1, inheritor1],
+        [testator2, inheritor2],
+        [testator3, inheritor3]
+      ].map(async ([testator, inheritor]) => {
+        await mockToken.transfer(testator.address, ONE_AVAX);
+        await approveAllowance({ signer: testator });
+        await heritage.connect(testator).addTestator(
+          inheritor.address,
+          mockToken.address,
+          10
+        );
+      }); 
+
+      await Promise.all(promises);
+    });
+
+    it('should revoke testament', async () => {
+      const _testator2 = await heritage.getTestator(testator2.address);
+
+      await expect(
+        heritage.connect(testator2).revoke()
+      )
+        .to.emit(heritage, 'Revoke')
+        .withArgs(..._testator2);
+
+      await expect(
+        heritage.getTestator(testator2.address)
+      )
+        .to.be.revertedWith('The testator does not exist.');
+
+      await expect(
+        heritage.getTestator(testator1.address)
+      )
+        .not.to.be.revertedWith('The testator does not exist.');
+
+      await expect(
+        heritage.getTestator(testator3.address)
+      )
+        .not.to.be.revertedWith('The testator does not exist.');
+    });
   });
 });
