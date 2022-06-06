@@ -96,6 +96,11 @@ contract Heritage is Ownable {
         address _token,
         uint16 _maxDays
     ) public greaterThan(_maxDays) uniqueTestator {
+        require(
+            inheritorToTestator[_inheritor] == address(0),
+            "Inheritor already have a testament."
+        );
+
         IERC20 token = IERC20(_token);
 
         uint256 _allowance = token.allowance(msg.sender, address(this));

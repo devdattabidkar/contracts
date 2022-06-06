@@ -1,44 +1,47 @@
-const { expect } = require('chai');
-const { ethers } = require('hardhat');
+const { expect } = require("chai");
+const { ethers } = require("hardhat");
 
-const ONE_AVAX = ethers.utils.parseEther('1');
+const ONE_AVAX = ethers.utils.parseEther("1");
 const STATUS = {
   ACTIVE: 0,
   INACTIVE: 1,
-  INHERITED: 2
+  INHERITED: 2,
 };
 
-describe('Heritage', () => {
+describe("Heritage", () => {
   let Heritage;
   let heritage;
   let Erc20;
   let mockToken;
-  
+
   const increaseDays = async (days) => {
-    await network.provider.send('evm_increaseTime', [days * 24 * 60 * 60]);
-    await network.provider.send('evm_mine');
+    await network.provider.send("evm_increaseTime", [days * 24 * 60 * 60]);
+    await network.provider.send("evm_mine");
   };
-  
-  const approveAllowance = async ({ allowance = ONE_AVAX, signer = testator } = {}) => {
-    await mockToken.connect(signer).approve(heritage.address, allowance);    
-  }
+
+  const approveAllowance = async ({
+    allowance = ONE_AVAX,
+    signer = testator,
+  } = {}) => {
+    await mockToken.connect(signer).approve(heritage.address, allowance);
+  };
 
   before(async () => {
     [
       owner,
-      testator, 
-      inheritor, 
-      accountWithoutAllowance, 
+      testator,
+      inheritor,
+      accountWithoutAllowance,
       accountNotInheritor,
       testator1,
       testator2,
       testator3,
       inheritor1,
       inheritor2,
-      inheritor3
+      inheritor3,
     ] = await ethers.getSigners();
 
-    Erc20 = await ethers.getContractFactory('MockERC20');
+    Erc20 = await ethers.getContractFactory("MockERC20");
 
     mockToken = await Erc20.deploy();
 
@@ -48,29 +51,27 @@ describe('Heritage', () => {
     await mockToken.transfer(testator.address, ONE_AVAX);
   });
 
-  beforeEach(async () =>{
-    Heritage = await ethers.getContractFactory('Heritage');
+  beforeEach(async () => {
+    Heritage = await ethers.getContractFactory("Heritage");
 
     heritage = await Heritage.deploy();
 
     await heritage.deployed();
   });
 
-  describe('addTestator', () => {
-    it('should add testator', async () => {
+  describe("addTestator", () => {
+    it("should add testator", async () => {
       await approveAllowance();
 
       const { timestamp } = await ethers.provider.getBlock();
       const maxDays = 10;
 
       await expect(
-          heritage.connect(testator).addTestator(
-          inheritor.address,
-          mockToken.address,
-          maxDays
-        ) 
+        heritage
+          .connect(testator)
+          .addTestator(inheritor.address, mockToken.address, maxDays)
       )
-        .to.emit(heritage, 'NewTestator')
+        .to.emit(heritage, "NewTestator")
         .withArgs(
           inheritor.address,
           STATUS.ACTIVE,
@@ -80,57 +81,60 @@ describe('Heritage', () => {
         );
     });
 
-    it('should throw if testator already have an inheritor', async() => {
+    it("should throw if testator already have an inheritor", async () => {
       await approveAllowance();
-      await heritage.connect(testator).addTestator(
-        inheritor.address,
-        mockToken.address,
-        10
-      );
+      await heritage
+        .connect(testator)
+        .addTestator(inheritor.address, mockToken.address, 10);
       await expect(
-        heritage.connect(testator).addTestator(
-          inheritor.address,
-          mockToken.address,
-          10
-        )   
-      )
-      .to.be.revertedWith('Testator already have a testament.');
+        heritage
+          .connect(testator)
+          .addTestator(inheritor.address, mockToken.address, 10)
+      ).to.be.revertedWith("Testator already have a testament.");
     });
 
-    it('should throw error if maxDays is lte 0', async() => {
+    it("should throw error if maxDays is lte 0", async () => {
       await expect(
-        heritage.connect(testator).addTestator(
-          inheritor.address,
-          mockToken.address,
-          0
-        )
-      )
-        .to.be.revertedWith('maxDays should be greater than 0.');
+        heritage
+          .connect(testator)
+          .addTestator(inheritor.address, mockToken.address, 0)
+      ).to.be.revertedWith("maxDays should be greater than 0.");
     });
 
-    it('should throw error if maxDays is lte 0', async() => {
+    it("should throw error if maxDays is lte 0", async () => {
       await expect(
-        heritage.connect(testator).addTestator(
-          accountWithoutAllowance.address,
-          mockToken.address,
-          10
-        )
-      )
-        .to.be.revertedWith('Token allowance should be greater than 0.');
+        heritage
+          .connect(testator)
+          .addTestator(accountWithoutAllowance.address, mockToken.address, 10)
+      ).to.be.revertedWith("Token allowance should be greater than 0.");
+    });
+
+    it("should throw if inheritor already has a testament", async () => {
+      await mockToken.transfer(testator2.address, ONE_AVAX);
+      await approveAllowance();
+      await approveAllowance({ signer: testator2 });
+
+      await heritage
+        .connect(testator)
+        .addTestator(inheritor.address, mockToken.address, 10);
+
+      await expect(
+        heritage
+          .connect(testator2)
+          .addTestator(inheritor.address, mockToken.address, 10)
+      ).to.be.revertedWith("Inheritor already have a testament.");
     });
   });
 
-  describe('getTestator', () => {
-    it('should return testator', async () => {
+  describe("getTestator", () => {
+    it("should return testator", async () => {
       await approveAllowance();
 
       const maxDays = 10;
 
-      await heritage.connect(testator).addTestator(
-        inheritor.address,
-        mockToken.address,
-        maxDays
-      );
+      await heritage
+        .connect(testator)
+        .addTestator(inheritor.address, mockToken.address, maxDays);
 
       const { timestamp } = await ethers.provider.getBlock();
       const result = await heritage.getTestator(testator.address);
@@ -142,46 +146,37 @@ describe('Heritage', () => {
       expect(result[4]).to.equal(maxDays);
     });
 
-    it('should revert if the testator does not exist', async () => {
-      await expect(
-        heritage.getTestator(testator.address)
-      )
-        .to.be.revertedWith('The testator does not exist.');
+    it("should revert if the testator does not exist", async () => {
+      await expect(heritage.getTestator(testator.address)).to.be.revertedWith(
+        "The testator does not exist."
+      );
     });
   });
 
-  describe('updateProof', () => {
+  describe("updateProof", () => {
     beforeEach(async () => {
       await approveAllowance();
-      
-      await heritage.connect(testator).addTestator(
-        inheritor.address,
-        mockToken.address,
-        10
-      );
+
+      await heritage
+        .connect(testator)
+        .addTestator(inheritor.address, mockToken.address, 10);
     });
 
-    it('should update proof timestamp', async () => {
+    it("should update proof timestamp", async () => {
       const { timestamp } = await ethers.provider.getBlock();
 
-      await expect(
-        heritage.connect(testator).updateProof() 
-      )
-        .to.emit(heritage, 'ProofUpdated')
-        .withArgs(
-          testator.address,
-          timestamp + 1
-        );
+      await expect(heritage.connect(testator).updateProof())
+        .to.emit(heritage, "ProofUpdated")
+        .withArgs(testator.address, timestamp + 1);
     });
 
-    it('should revert if sender is not testator', async () => {
+    it("should revert if sender is not testator", async () => {
       await expect(
-        heritage.connect(inheritor).updateProof() 
-      )
-        .to.be.revertedWith('The address is not a valid testator.');
+        heritage.connect(inheritor).updateProof()
+      ).to.be.revertedWith("The address is not a valid testator.");
     });
 
-    it('should revert if timestamp already pass', async () => {
+    it("should revert if timestamp already pass", async () => {
       const oldTestator = await heritage.getTestator(testator.address);
 
       await increaseDays(11);
@@ -194,32 +189,24 @@ describe('Heritage', () => {
     });
   });
 
-  describe('inherit', () => {
+  describe("inherit", () => {
     beforeEach(async () => {
       await approveAllowance();
-      
-      await heritage.connect(testator).addTestator(
-        inheritor.address,
-        mockToken.address,
-        10
-      );
+
+      await heritage
+        .connect(testator)
+        .addTestator(inheritor.address, mockToken.address, 10);
     });
 
-    it('should transfer tokens', async () => {
+    it("should transfer tokens", async () => {
       await increaseDays(11);
 
       const oldTestatorBalance = await mockToken.balanceOf(testator.address);
       const oldInheritorBalance = await mockToken.balanceOf(inheritor.address);
 
-      await expect(
-        heritage.connect(inheritor).inherit()
-      )
-        .to.emit(heritage, 'Inherited')
-        .withArgs(
-          testator.address,
-          inheritor.address,
-          ONE_AVAX
-        );
+      await expect(heritage.connect(inheritor).inherit())
+        .to.emit(heritage, "Inherited")
+        .withArgs(testator.address, inheritor.address, ONE_AVAX);
 
       const newTestatorBalance = await mockToken.balanceOf(testator.address);
       const newInheritorBalance = await mockToken.balanceOf(inheritor.address);
@@ -227,70 +214,63 @@ describe('Heritage', () => {
 
       expect(result[1]).to.equal(STATUS.INHERITED);
       expect(newTestatorBalance).to.equal(0);
-      expect(newInheritorBalance).to.equal(oldTestatorBalance.add(oldInheritorBalance));
+      expect(newInheritorBalance).to.equal(
+        oldTestatorBalance.add(oldInheritorBalance)
+      );
     });
 
-    it('should revert if sender is not inheritor', async () => {
+    it("should revert if sender is not inheritor", async () => {
       await increaseDays(11);
 
       await expect(
         heritage.connect(accountNotInheritor).inherit()
-      )
-        .to.be.revertedWith('The address is not a valid inheritor.');
+      ).to.be.revertedWith("The address is not a valid inheritor.");
     });
 
-    it('should revert if time did not pass', async () => {
+    it("should revert if time did not pass", async () => {
       await increaseDays(5);
 
-      await expect(
-        heritage.connect(inheritor).inherit()
-      )
-        .to.be.revertedWith('The max days did not passed yet.');
-    })
+      await expect(heritage.connect(inheritor).inherit()).to.be.revertedWith(
+        "The max days did not passed yet."
+      );
+    });
   });
 
-  describe('revoke', () => {
+  describe("revoke", () => {
     beforeEach(async () => {
       const promises = [
         [testator1, inheritor1],
         [testator2, inheritor2],
-        [testator3, inheritor3]
+        [testator3, inheritor3],
       ].map(async ([testator, inheritor]) => {
         await mockToken.transfer(testator.address, ONE_AVAX);
         await approveAllowance({ signer: testator });
-        await heritage.connect(testator).addTestator(
-          inheritor.address,
-          mockToken.address,
-          10
-        );
-      }); 
+        await heritage
+          .connect(testator)
+          .addTestator(inheritor.address, mockToken.address, 10);
+      });
 
       await Promise.all(promises);
     });
 
-    it('should revoke testament', async () => {
+    it("should revoke testament", async () => {
       const _testator2 = await heritage.getTestator(testator2.address);
 
-      await expect(
-        heritage.connect(testator2).revoke()
-      )
-        .to.emit(heritage, 'Revoke')
+      await expect(heritage.connect(testator2).revoke())
+        .to.emit(heritage, "Revoke")
         .withArgs(..._testator2);
 
-      await expect(
-        heritage.getTestator(testator2.address)
-      )
-        .to.be.revertedWith('The testator does not exist.');
+      await expect(heritage.getTestator(testator2.address)).to.be.revertedWith(
+        "The testator does not exist."
+      );
 
       await expect(
         heritage.getTestator(testator1.address)
-      )
-        .not.to.be.revertedWith('The testator does not exist.');
+      ).not.to.be.revertedWith("The testator does not exist.");
 
       await expect(
         heritage.getTestator(testator3.address)
-      )
-        .not.to.be.revertedWith('The testator does not exist.');
+      ).not.to.be.revertedWith("The testator does not exist.");
     });
   });
 });
