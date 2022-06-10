@@ -3,7 +3,7 @@ pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-uint256 constant TOTAL_SUPPLY = 1000000000000000000000000000;
+uint256 constant TOTAL_SUPPLY = 1000000000e18;
 string constant NAME = "PEACE_TOKEN";
 string constant SYMBOL = "PAZ";
 
