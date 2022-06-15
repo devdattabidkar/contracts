@@ -9,7 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract Heritage is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    event NewTestator(
+    event NewTestament(
+        address testator,
         address inheritor,
         Status status,
         uint256 proofOfTimestamp,
@@ -17,16 +18,27 @@ contract Heritage is Ownable, ReentrancyGuard {
         uint16 maxDays
     );
 
-    event ProofUpdated(
+    event TestamentUpdated(
         address testator,
-        bool updated,
+        address inheritor,
         Status status,
-        uint256 proofOfTimestamp
+        uint256 proofOfTimestamp,
+        address token,
+        uint16 maxDays
     );
 
-    event Inherited(address testator, address inheritor, uint256 balance);
+    event Inherited(
+        address testator,
+        address inheritor,
+        Status status,
+        uint256 proofOfTimestamp,
+        address token,
+        uint16 maxDays,
+        uint256 balance
+    );
 
     event Revoke(
+        address testator,
         address inheritor,
         Status status,
         uint256 proofOfTimestamp,
@@ -48,12 +60,12 @@ contract Heritage is Ownable, ReentrancyGuard {
         uint16 maxDays;
     }
 
-    mapping(address => Testator) private testators;
-    mapping(address => address) private inheritorToTestator;
+    mapping(address => Testator) private testaments;
+    mapping(address => address) private inheritorToTestament;
 
     modifier onlyTestator() {
         require(
-            testators[msg.sender].inheritor != address(0),
+            testaments[msg.sender].inheritor != address(0),
             "The address is not a valid testator."
         );
         _;
@@ -61,7 +73,7 @@ contract Heritage is Ownable, ReentrancyGuard {
 
     modifier onlyActive() {
         require(
-            testators[msg.sender].status == Status.ACTIVE,
+            testaments[msg.sender].status == Status.ACTIVE,
             "The address holder is not active."
         );
         _;
@@ -69,14 +81,16 @@ contract Heritage is Ownable, ReentrancyGuard {
 
     modifier onlyInheritor() {
         require(
-            inheritorToTestator[msg.sender] != address(0),
+            inheritorToTestament[msg.sender] != address(0),
             "The address is not a valid inheritor."
         );
         _;
     }
 
     modifier timeAlreadyPassed() {
-        Testator storage _testator = testators[inheritorToTestator[msg.sender]];
+        Testator storage _testator = testaments[
+            inheritorToTestament[msg.sender]
+        ];
         uint256 _timestamp = block.timestamp;
 
         require(
@@ -94,19 +108,19 @@ contract Heritage is Ownable, ReentrancyGuard {
 
     modifier uniqueTestator() {
         require(
-            testators[msg.sender].inheritor == address(0),
+            testaments[msg.sender].inheritor == address(0),
             "Testator already have a testament."
         );
         _;
     }
 
-    function addTestator(
+    function addTestament(
         address _inheritor,
         address _token,
         uint16 _maxDays
     ) public greaterThan(_maxDays) uniqueTestator {
         require(
-            inheritorToTestator[_inheritor] == address(0),
+            inheritorToTestament[_inheritor] == address(0),
             "Inheritor already have a testament."
         );
 
@@ -124,11 +138,12 @@ contract Heritage is Ownable, ReentrancyGuard {
             _maxDays
         );
 
-        testators[msg.sender] = _testator;
+        testaments[msg.sender] = _testator;
 
-        inheritorToTestator[_inheritor] = msg.sender;
+        inheritorToTestament[_inheritor] = msg.sender;
 
-        emit NewTestator(
+        emit NewTestament(
+            msg.sender,
             _testator.inheritor,
             _testator.status,
             _testator.proofOfTimestamp,
@@ -140,43 +155,25 @@ contract Heritage is Ownable, ReentrancyGuard {
     function getTestator(address _testatorAddress)
         public
         view
-        returns (
-            address,
-            Status,
-            uint256,
-            address,
-            uint16
-        )
+        returns (Testator memory)
     {
-        Testator memory _testator = testators[_testatorAddress];
+        Testator storage _testator = testaments[_testatorAddress];
 
         require(
             _testator.inheritor != address(0x00),
             "The testator does not exist."
         );
 
-        return (
-            _testator.inheritor,
-            _testator.status,
-            _testator.proofOfTimestamp,
-            _testator.token,
-            _testator.maxDays
-        );
+        return _testator;
     }
 
     function getInheritor(address _inheritorAddress)
         public
         view
-        returns (
-            address,
-            Status,
-            uint256,
-            address,
-            uint16
-        )
+        returns (Testator memory)
     {
-        Testator memory _testator = testators[
-            inheritorToTestator[_inheritorAddress]
+        Testator storage _testator = testaments[
+            inheritorToTestament[_inheritorAddress]
         ];
 
         require(
@@ -184,7 +181,32 @@ contract Heritage is Ownable, ReentrancyGuard {
             "The inheritor does not exist."
         );
 
-        return (
+        return _testator;
+    }
+
+    function updateTestament(
+        address _inheritor,
+        address _token,
+        uint16 _maxDays
+    ) public onlyActive onlyTestator {
+        uint256 _timestamp = block.timestamp;
+
+        Testator storage _testator = testaments[msg.sender];
+
+        if (
+            _timestamp >=
+            _testator.proofOfTimestamp + _testator.maxDays * 1 days
+        ) {
+            _testator.status = Status.INACTIVE;
+        } else {
+            _testator.inheritor = _inheritor;
+            _testator.maxDays = _maxDays;
+            _testator.proofOfTimestamp = _timestamp;
+            _testator.token = _token;
+        }
+
+        emit TestamentUpdated(
+            msg.sender,
             _testator.inheritor,
             _testator.status,
             _testator.proofOfTimestamp,
@@ -193,52 +215,51 @@ contract Heritage is Ownable, ReentrancyGuard {
         );
     }
 
-    function updateProof() public onlyTestator {
-        uint256 _timestamp = block.timestamp;
+    function updateProof() public {
+        Testator storage _testator = testaments[msg.sender];
 
-        Testator storage _testator = testators[msg.sender];
-
-        if (
-            _timestamp >=
-            _testator.proofOfTimestamp + _testator.maxDays * 1 days
-        ) {
-            _testator.status = Status.INACTIVE;
-        } else {
-            _testator.proofOfTimestamp = _timestamp;
-        }
-
-        emit ProofUpdated(
-            msg.sender,
-            _testator.status == Status.ACTIVE,
-            _testator.status,
-            _testator.proofOfTimestamp
+        updateTestament(
+            _testator.inheritor,
+            _testator.token,
+            _testator.maxDays
         );
     }
 
     function inherit() public onlyInheritor timeAlreadyPassed nonReentrant {
-        Testator storage _testator = testators[inheritorToTestator[msg.sender]];
+        Testator storage _testator = testaments[
+            inheritorToTestament[msg.sender]
+        ];
 
         IERC20 token = IERC20(_testator.token);
-        uint256 _balance = token.balanceOf(inheritorToTestator[msg.sender]);
+        uint256 _balance = token.balanceOf(inheritorToTestament[msg.sender]);
 
         _testator.status = Status.INHERITED;
 
         token.safeTransferFrom(
-            inheritorToTestator[msg.sender],
+            inheritorToTestament[msg.sender],
             msg.sender,
             _balance
         );
 
-        emit Inherited(inheritorToTestator[msg.sender], msg.sender, _balance);
+        emit Inherited(
+            inheritorToTestament[msg.sender],
+            msg.sender,
+            _testator.status,
+            _testator.proofOfTimestamp,
+            _testator.token,
+            _testator.maxDays,
+            _balance
+        );
     }
 
     function revoke() public onlyTestator onlyActive {
-        Testator memory _testator = testators[msg.sender];
+        Testator memory _testator = testaments[msg.sender];
 
-        delete inheritorToTestator[_testator.inheritor];
-        delete testators[msg.sender];
+        delete inheritorToTestament[_testator.inheritor];
+        delete testaments[msg.sender];
 
         emit Revoke(
+            msg.sender,
             _testator.inheritor,
             _testator.status,
             _testator.proofOfTimestamp,
