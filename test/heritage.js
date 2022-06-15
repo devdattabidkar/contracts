@@ -43,7 +43,11 @@ describe("Heritage", () => {
 
     Erc20 = await ethers.getContractFactory("MockERC20");
 
-    mockToken = await Erc20.deploy();
+    mockToken = await Erc20.deploy(
+      "PEACE",
+      "PAZ",
+      ethers.utils.parseEther("1000000")
+    );
 
     await mockToken.deployed();
 

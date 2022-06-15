@@ -4,6 +4,7 @@
     "check:format": "solhint contracts/*.sol --fix",
     "check": "solhint contracts/*.sol",
     "deploy:testnet": "npx hardhat run --network avalancheFuji scripts/deploy.js",
+    "deploy:mock-erc20": "npx hardhat run --network avalancheFuji scripts/deploy-mock-erc20.js",
     "test:coverage": "npx hardhat coverage",
     "test": "npx hardhat test",
     "verify:testnet": "npx hardhat verify --network avalancheFuji"

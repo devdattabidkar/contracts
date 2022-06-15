@@ -3,12 +3,12 @@ pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-uint256 constant TOTAL_SUPPLY = 1000000000e18;
-string constant NAME = "PEACE_TOKEN";
-string constant SYMBOL = "PAZ";
-
 contract MockERC20 is ERC20 {
-    constructor() ERC20(NAME, SYMBOL) {
-        _mint(msg.sender, TOTAL_SUPPLY);
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        uint256 _totalSupply
+    ) ERC20(_name, _symbol) {
+        _mint(msg.sender, _totalSupply);
     }
 }
