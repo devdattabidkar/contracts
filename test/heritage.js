@@ -153,6 +153,33 @@ describe("Heritage", () => {
     });
   });
 
+  describe("getInheritor", () => {
+    it("should return inheritor", async () => {
+      await approveAllowance();
+
+      const maxDays = 10;
+
+      await heritage
+        .connect(testator)
+        .addTestator(inheritor.address, mockToken.address, maxDays);
+
+      const { timestamp } = await ethers.provider.getBlock();
+      const result = await heritage.getInheritor(inheritor.address);
+
+      expect(result[0]).to.equal(inheritor.address);
+      expect(result[1]).to.equal(STATUS.ACTIVE);
+      expect(result[2]).to.equal(timestamp);
+      expect(result[3]).to.equal(mockToken.address);
+      expect(result[4]).to.equal(maxDays);
+    });
+
+    it("should revert if the testator does not exist", async () => {
+      await expect(heritage.getInheritor(testator.address)).to.be.revertedWith(
+        "The inheritor does not exist."
+      );
+    });
+  });
+
   describe("updateProof", () => {
     beforeEach(async () => {
       await approveAllowance();
@@ -167,7 +194,7 @@ describe("Heritage", () => {
 
       await expect(heritage.connect(testator).updateProof())
         .to.emit(heritage, "ProofUpdated")
-        .withArgs(testator.address, timestamp + 1);
+        .withArgs(testator.address, true, STATUS.ACTIVE, timestamp + 1);
     });
 
     it("should revert if sender is not testator", async () => {
@@ -176,16 +203,15 @@ describe("Heritage", () => {
       ).to.be.revertedWith("The address is not a valid testator.");
     });
 
-    it("should revert if timestamp already pass", async () => {
-      const oldTestator = await heritage.getTestator(testator.address);
+    it("should update status if timestamp already pass", async () => {
+      const testatorStatus = await heritage.getTestator(testator.address);
 
       await increaseDays(11);
       await heritage.connect(testator).updateProof();
 
-      const newTestator = await heritage.getTestator(testator.address);
-
-      expect(newTestator[1]).to.equal(STATUS.INACTIVE);
-      expect(newTestator[2]).to.equal(oldTestator[2]);
+      await expect(heritage.connect(testator).updateProof())
+        .to.emit(heritage, "ProofUpdated")
+        .withArgs(testator.address, false, STATUS.INACTIVE, testatorStatus[2]);
     });
   });
 

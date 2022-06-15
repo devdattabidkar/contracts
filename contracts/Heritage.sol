@@ -17,9 +17,14 @@ contract Heritage is Ownable, ReentrancyGuard {
         uint16 maxDays
     );
 
-    event ProofUpdated(address testator, uint256 timestamp);
+    event ProofUpdated(
+        address testator,
+        bool updated,
+        Status status,
+        uint256 proofOfTimestamp
+    );
 
-    event Inherited(address _testator, address _inheritor, uint256 _balance);
+    event Inherited(address testator, address inheritor, uint256 balance);
 
     event Revoke(
         address inheritor,
@@ -159,7 +164,36 @@ contract Heritage is Ownable, ReentrancyGuard {
         );
     }
 
-    function updateProof() public onlyTestator onlyActive returns (bool) {
+    function getInheritor(address _inheritorAddress)
+        public
+        view
+        returns (
+            address,
+            Status,
+            uint256,
+            address,
+            uint16
+        )
+    {
+        Testator memory _testator = testators[
+            inheritorToTestator[_inheritorAddress]
+        ];
+
+        require(
+            _testator.inheritor != address(0x00),
+            "The inheritor does not exist."
+        );
+
+        return (
+            _testator.inheritor,
+            _testator.status,
+            _testator.proofOfTimestamp,
+            _testator.token,
+            _testator.maxDays
+        );
+    }
+
+    function updateProof() public onlyTestator {
         uint256 _timestamp = block.timestamp;
 
         Testator storage _testator = testators[msg.sender];
@@ -169,15 +203,16 @@ contract Heritage is Ownable, ReentrancyGuard {
             _testator.proofOfTimestamp + _testator.maxDays * 1 days
         ) {
             _testator.status = Status.INACTIVE;
-
-            return false;
+        } else {
+            _testator.proofOfTimestamp = _timestamp;
         }
 
-        _testator.proofOfTimestamp = _timestamp;
-
-        emit ProofUpdated(msg.sender, _timestamp);
-
-        return true;
+        emit ProofUpdated(
+            msg.sender,
+            _testator.status == Status.ACTIVE,
+            _testator.status,
+            _testator.proofOfTimestamp
+        );
     }
 
     function inherit() public onlyInheritor timeAlreadyPassed nonReentrant {
