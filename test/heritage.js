@@ -339,6 +339,16 @@ describe("Heritage", () => {
         "The max days did not passed yet."
       );
     });
+
+    it("should revert if the heritage has been already inherited", async () => {
+      await increaseDays(11);
+
+      await expect(heritage.connect(inheritor).inherit());
+
+      await expect(heritage.connect(inheritor).inherit()).to.be.revertedWith(
+        "The heritage has been already inherited."
+      );
+    });
   });
 
   describe("revoke", () => {

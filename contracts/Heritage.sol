@@ -230,6 +230,11 @@ contract Heritage is Ownable, ReentrancyGuard {
             inheritorToTestament[msg.sender]
         ];
 
+        require(
+            _testator.status == Status.ACTIVE,
+            "The heritage has been already inherited."
+        );
+
         IERC20 token = IERC20(_testator.token);
         uint256 _balance = token.balanceOf(inheritorToTestament[msg.sender]);
 
